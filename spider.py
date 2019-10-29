@@ -7,8 +7,9 @@ from lxml import etree
 import re
 import json
 from sys import argv
-import os,sys,io
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer,encoding='utf-8')
+import os, sys, io
+
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 
 # 百度搜索接口
@@ -20,9 +21,9 @@ def format_url(url, params: dict = None) -> str:
 
 def get_url(keyword):
     params = {
-        'wd': str(keyword)
+        'q': str(keyword)
     }
-    url = "https://www.baidu.com/s"
+    url = "https://www.google.com.hk/search"
     url = format_url(url, params)
     # print(url)
 
@@ -61,17 +62,18 @@ def parse_page(url, page):
         html = get_page(url)
         html = html.replace(u'\xa0', u' ')
         content = etree.HTML(html)
+        a=content.xpath('//*[@id="rso"]')
         for j in range(1, flag):
             data = {}
-            res_title = content.xpath('//*[@id="%d"]/h3/a' % ((i - 1) * 10 + j))
+            res_title = content.xpath('//*[@id="rso"]/div[%d]/div/div[1]/div/div[1]/a/h3' % j)
             if res_title:
                 title = res_title[0].xpath('string(.)')
 
-            sub_url = content.xpath('//*[@id="%d"]/h3/a/@href' % ((i - 1) * 10 + j))
+            sub_url = content.xpath('//*[@id="rso"]/div[%d]/div/div[1]/div/div[1]/a/@href' % j)
             if sub_url:
                 sub_url = sub_url[0]
 
-            res_abstract = content.xpath('//*[@id="%d"]/div[@class="c-abstract"]' % ((i - 1) * 10 + j))
+            res_abstract = content.xpath('//*[@id="rso"]/div[%d]/div/div[1]/div/div[2]/div[1]' % j)
             if res_abstract:
                 abstract = res_abstract[0].xpath('string(.)')
             else:
@@ -85,12 +87,12 @@ def parse_page(url, page):
             data['sub_url'] = sub_url
             data['abstract'] = abstract
 
-            rel_url = content.xpath('//*[@id="page"]/a[{}]/@href'.format(flag))
-            if rel_url:
-                url = urljoin(url, rel_url[0])
-            else:
-                # print("无更多页面！～")
-                return
+            # rel_url = content.xpath('//*[@id="nav"]/tbody/tr/td[{}]/a/@href'.format(flag))
+            # if rel_url:
+            #     url = urljoin(url, rel_url[0])
+            # else:
+            #     # print("无更多页面！～")
+            #     return
             yield data
 
 
