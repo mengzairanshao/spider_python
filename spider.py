@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import requests
 import urllib.parse
+
+from bs4 import BeautifulSoup
 from requests.exceptions import RequestException
 from urllib.parse import urljoin
 from lxml import etree
@@ -9,7 +11,8 @@ import json
 from sys import argv
 import os, sys, io
 
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+
+# sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 
 # 百度搜索接口
@@ -50,50 +53,29 @@ def get_page(url):
         return None
 
 
-def parse_page(url, page):
-    for i in range(1, int(page) + 1):
-        # print("正在爬取第{}页....".format(i))
-        title = ""
-        sub_url = ""
-        abstract = ""
-        flag = 11
-        if i == 1:
-            flag = 10
-        html = get_page(url)
-        html = html.replace(u'\xa0', u' ')
-        content = etree.HTML(html)
-        a=content.xpath('//*[@id="rso"]')
-        for j in range(1, flag):
-            data = {}
-            res_title = content.xpath('//*[@id="rso"]/div[%d]/div/div[1]/div/div[1]/a/h3' % j)
-            if res_title:
-                title = res_title[0].xpath('string(.)')
-
-            sub_url = content.xpath('//*[@id="rso"]/div[%d]/div/div[1]/div/div[1]/a/@href' % j)
-            if sub_url:
-                sub_url = sub_url[0]
-
-            res_abstract = content.xpath('//*[@id="rso"]/div[%d]/div/div[1]/div/div[2]/div[1]' % j)
-            if res_abstract:
-                abstract = res_abstract[0].xpath('string(.)')
-            else:
-                res_abstract = content.xpath('//*[@id="%d"]/div/div[2]/div[@class="c-abstract"]' % ((i - 1) * 10 + j))
-                if res_abstract:
-                    abstract = res_abstract[0].xpath('string(.)')
-                    # res_abstract = content.xpath('//*[@id="%d"]/div/div[2]/p[1]'%((i-1)*10+j))
-            # if not abstract:
-            #     abstract = content.xpath('//*[@id="%d"]/div/div[2]/p[1]'%((i-1)*10+j))[0].xpath('string(.)')
-            data['title'] = title
-            data['sub_url'] = sub_url
-            data['abstract'] = abstract
-
-            # rel_url = content.xpath('//*[@id="nav"]/tbody/tr/td[{}]/a/@href'.format(flag))
-            # if rel_url:
-            #     url = urljoin(url, rel_url[0])
-            # else:
-            #     # print("无更多页面！～")
-            #     return
-            yield data
+def parse_page1(url, page):
+    html = get_page(url)
+    soup = BeautifulSoup(html, "lxml")
+    c = soup.select('.bkWMgd')
+    c1 = []
+    for cc in c:
+        if len(cc.contents) > 0 and str(cc.contents[0]).startswith('<h2 class="bNg8Rb">'):
+            c1.extend(cc.select('.rc'))
+    rt = []
+    m = {'title': '', 'abstract': '', 'url': '', 'description': ''}
+    for cc in c1:
+        m['title'] = cc.select('.r')[0].select('a')[0].select('.S3Uucc')[0].get_text()
+        m['abstract'] = cc.select('.s')[0].select('.st')[0].get_text()
+        m['url'] = cc.select('.r')[0].select('a')[0]['href']
+        ss = m['url'].split('/')
+        domain = ss[0] + '//' + ss[2]
+        html1 = get_page(domain)
+        soup1 = BeautifulSoup(html1, "lxml")
+        c2 = soup1.find(attrs={"name": "description"})
+        if c2 is not None:
+            m['description'] = c2['content']
+        rt.append(m.copy())
+    return rt
 
 
 def main(keyword, page, op):
@@ -102,7 +84,7 @@ def main(keyword, page, op):
         page = input("输入查找页数:")
     url = get_url(keyword)
 
-    results = parse_page(url, page)
+    results = parse_page1(url, page)
     for result in results:
         for k in result.keys():
             print(result[k])
