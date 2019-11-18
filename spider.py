@@ -8,6 +8,8 @@ from sys import argv
 from time import sleep
 import json
 import sqlite3
+import time, platform
+import os
 
 threads = []
 lock = threading.Lock()
@@ -143,6 +145,29 @@ def threads_parse_page(keyword, page):
     return 0
 
 
+def createDaemon():
+    # fork进程
+    try:
+        if os.fork() > 0: os._exit(0)
+    except OSError as error:
+        print('fork #1 failed: {} {}'.format(error.errno, error.strerror))
+        os._exit(1)
+    os.chdir('/')
+    os.setsid()
+    os.umask(0)
+    try:
+        pid = os.fork()
+        if pid > 0:
+            print('Daemon PID %d' % pid)
+            os._exit(0)
+    except OSError as error:
+        print('fork #2 failed: %d (%s)' % (error.errno, error.strerror))
+        os._exit(1)
+    # 重定向标准IO
+    # 在子进程中执行代码
+    main('', '', 1)  # function demo
+
+
 def main(keyword, page, op):
     if op == 0:
         keyword = input("输入关键字:")
@@ -156,9 +181,12 @@ def main(keyword, page, op):
 
 if __name__ == '__main__':
     create_table()
-    if len(argv) == 1:
-        main("", "", 0)
+    if platform.system() == "Linux":
+        createDaemon()
     else:
-        keyword_1 = argv[1]
-        page_1 = argv[2]
-        main(keyword_1, page_1, 1)
+        if len(argv) == 1:
+            main("", "", 0)
+        else:
+            keyword_1 = argv[1]
+            page_1 = argv[2]
+            main(keyword_1, page_1, 1)
