@@ -69,8 +69,11 @@ def get_page(url):
         # print(response.text)
         if response.status_code == 200:
             return response.text
+        print('status is not 200')
+        print(response.text)
         return None
     except RequestException:
+        print('request exception')
         return None
 
 
