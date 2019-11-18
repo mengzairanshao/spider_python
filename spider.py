@@ -10,6 +10,7 @@ import json
 import sqlite3
 import time, platform
 import os
+import random
 
 threads = []
 lock = threading.Lock()
@@ -154,7 +155,7 @@ def threads_parse_page(keyword, page):
         t.start()
         threads.append(t)
         print('ready to start thread ',keyword)
-        sleep(sleep_time)
+        sleep(random.randint(5,20))
     return 0
 
 
