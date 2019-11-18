@@ -1,21 +1,17 @@
 # -*- coding: utf-8 -*-
+import threading
 import requests
 import urllib.parse
-
 from bs4 import BeautifulSoup
 from requests.exceptions import RequestException
-from urllib.parse import urljoin
-from lxml import etree
-import re
-import json
 from sys import argv
-import os, sys, io
 
-
-# sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+rt = []
+threads = []
 
 
 # 百度搜索接口
+
 
 def format_url(url, params: dict = None) -> str:
     query_str = urllib.parse.urlencode(params)
@@ -53,28 +49,42 @@ def get_page(url):
         return None
 
 
+def threads_get_description(url, i):
+    global rt
+    html1 = get_page(url)
+    soup1 = BeautifulSoup(html1, "lxml")
+    c2 = soup1.find(attrs={"name": "description"})
+    if c2 is not None:
+        rt[i]['description'] = c2['content']
+    return 0
+
+
 def parse_page1(url, page):
+    global rt
     html = get_page(url)
+    if html is None:
+        return rt
     soup = BeautifulSoup(html, "lxml")
     c = soup.select('.bkWMgd')
     c1 = []
     for cc in c:
         if len(cc.contents) > 0 and str(cc.contents[0]).startswith('<h2 class="bNg8Rb">'):
             c1.extend(cc.select('.rc'))
-    rt = []
     m = {'title': '', 'abstract': '', 'url': '', 'description': ''}
     for cc in c1:
-        m['title'] = cc.select('.r')[0].select('a')[0].select('.S3Uucc')[0].get_text()
-        m['abstract'] = cc.select('.s')[0].select('.st')[0].get_text()
-        m['url'] = cc.select('.r')[0].select('a')[0]['href']
-        ss = m['url'].split('/')
-        domain = ss[0] + '//' + ss[2]
-        html1 = get_page(domain)
-        soup1 = BeautifulSoup(html1, "lxml")
-        c2 = soup1.find(attrs={"name": "description"})
-        if c2 is not None:
-            m['description'] = c2['content']
-        rt.append(m.copy())
+        try:
+            m['title'] = cc.select('.r')[0].select('a')[0].select('.S3Uucc')[0].get_text()
+            m['abstract'] = cc.select('.s')[0].select('.st')[0].get_text()
+            m['url'] = cc.select('.r')[0].select('a')[0]['href']
+            ss = m['url'].split('/')
+            domain = ss[0] + '//' + ss[2]
+            rt.append(m.copy())
+            t = threading.Thread(target=threads_get_description, args=(domain, len(rt) - 1))
+            t.start()
+            threads.append(t)
+        except:
+            m.clear()
+            print('该条目无法解析')
     return rt
 
 
@@ -85,6 +95,8 @@ def main(keyword, page, op):
     url = get_url(keyword)
 
     results = parse_page1(url, page)
+    for t in threads:
+        t.join()
     for result in results:
         for k in result.keys():
             print(result[k])
