@@ -5,12 +5,37 @@ import urllib.parse
 from bs4 import BeautifulSoup
 from requests.exceptions import RequestException
 from sys import argv
+from time import sleep
+import json
+import sqlite3
 
-rt = []
 threads = []
+lock = threading.Lock()
+sleep_time = 1
+cat = ['Phones ', 'Accessories', 'Consumer Electronics', 'Home Appliances', 'Computer ', 'Office', 'Wigs ',
+       'Hair Extensions', 'Womens Clothing', 'Mens Clothing', 'Sports ', 'Outdoors', 'Home ', 'Garden', 'Health ',
+       'Beauty', 'Toys, Kids ', 'Babies', 'Shoes ', 'Bags', 'Jewelry ', 'Watches', 'Automotive ', 'Motorcycles']
 
 
-# 百度搜索接口
+# google搜索接口
+
+
+def create_table():
+    conn = sqlite3.connect('test.db')
+    c = conn.cursor()
+    sql1 = '''CREATE TABLE '''
+    sql3 = ''' (
+           id INTEGER PRIMARY KEY AUTOINCREMENT,
+           title TEXT,
+           abstract TEXT,
+           url  TEXT,
+           description TEXT);'''
+    try:
+        for sql2 in cat:
+            c.execute(sql1 + sql2.strip(' ').replace(',', ' ').replace('  ', ' ').replace(' ', '_') + sql3)
+    except sqlite3.OperationalError as e:
+        print(e)
+    return
 
 
 def format_url(url, params: dict = None) -> str:
@@ -18,10 +43,7 @@ def format_url(url, params: dict = None) -> str:
     return f'{url}?{query_str}'
 
 
-def get_url(keyword):
-    params = {
-        'q': str(keyword)
-    }
+def get_url(params):
     url = "https://www.google.com.hk/search"
     url = format_url(url, params)
     # print(url)
@@ -49,21 +71,44 @@ def get_page(url):
         return None
 
 
-def threads_get_description(url, i):
-    global rt
+def threads_get_description(keyword, url, m):
     html1 = get_page(url)
+    if html1 is None:
+        return
     soup1 = BeautifulSoup(html1, "lxml")
     c2 = soup1.find(attrs={"name": "description"})
+    m['description'] = ' '
     if c2 is not None:
-        rt[i]['description'] = c2['content']
+        m['description'] = c2['content']
+    # 写入数据库 TODO
+    lock.acquire()
+    conn = sqlite3.connect('test.db')
+    c = conn.cursor()
+    sql1 = keyword.strip(' ').replace(',', ' ').replace(' ', '_')
+    sql = 'INSERT INTO ' + sql1 + ' (title,abstract,url,description) VALUES("' + m['title'].replace('"', "'") + '","' + \
+          m['abstract'].replace('"', "'") + '","' + m['url'].replace('"', "'") + '","' + m['description'].replace('"',
+                                                                                                                  "'") + '")'
+    print(sql)
+    try:
+        c.execute(sql)
+        conn.commit()
+    except:
+        conn.rollback()
+        print('执行该SQL语句错误')
+    conn.close()
+    lock.release()
     return 0
 
 
-def parse_page1(url, page):
-    global rt
+def parse_page1(keyword, page):
+    params = {
+        'q': str(keyword),
+        'start': page * 10
+    }
+    url = get_url(params)
     html = get_page(url)
     if html is None:
-        return rt
+        return
     soup = BeautifulSoup(html, "lxml")
     c = soup.select('.bkWMgd')
     c1 = []
@@ -73,46 +118,47 @@ def parse_page1(url, page):
     m = {'title': '', 'abstract': '', 'url': '', 'description': ''}
     for cc in c1:
         try:
+            m.clear()
             m['title'] = cc.select('.r')[0].select('a')[0].select('.S3Uucc')[0].get_text()
             m['abstract'] = cc.select('.s')[0].select('.st')[0].get_text()
             m['url'] = cc.select('.r')[0].select('a')[0]['href']
             ss = m['url'].split('/')
             domain = ss[0] + '//' + ss[2]
-            rt.append(m.copy())
-            t = threading.Thread(target=threads_get_description, args=(domain, len(rt) - 1))
+            # 加锁保护临界资源
+            t = threading.Thread(target=threads_get_description, args=(keyword, domain, m.copy()))
             t.start()
             threads.append(t)
         except:
             m.clear()
             print('该条目无法解析')
-    return rt
+    return
+
+
+def threads_parse_page(keyword, page):
+    for i in range(0, page):
+        t = threading.Thread(target=parse_page1, args=(keyword, i))
+        t.start()
+        threads.append(t)
+        sleep(sleep_time)
+    return 0
 
 
 def main(keyword, page, op):
     if op == 0:
         keyword = input("输入关键字:")
         page = input("输入查找页数:")
-    url = get_url(keyword)
-
-    results = parse_page1(url, page)
+    for k in cat:
+        threads_parse_page(k, 1)
+    # threads_parse_page(keyword, int(page))
     for t in threads:
         t.join()
-    for result in results:
-        for k in result.keys():
-            print(result[k])
-            print("<br>")
-        print("<br><br>")
-    # 写入文件
-    # file = open("data.json", 'w+', encoding='utf-8')
-    # for result in results:
-    #     print(result)
-    #     file.write(json.dumps(result, indent=2, ensure_ascii=False))
 
 
 if __name__ == '__main__':
+    create_table()
     if len(argv) == 1:
         main("", "", 0)
     else:
-        keyword = argv[1]
-        page = argv[2]
-        main(keyword, page, 1)
+        keyword_1 = argv[1]
+        page_1 = argv[2]
+        main(keyword_1, page_1, 1)
