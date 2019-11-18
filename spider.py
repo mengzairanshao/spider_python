@@ -169,11 +169,11 @@ def createDaemon():
 
 
 def main(keyword, page, op):
-    if op == 0:
-        keyword = input("输入关键字:")
-        page = input("输入查找页数:")
+    # if op == 0:
+    #     keyword = input("输入关键字:")
+    #     page = input("输入查找页数:")
     for k in cat:
-        threads_parse_page(k, 1)
+        threads_parse_page(k, 100)
     # threads_parse_page(keyword, int(page))
     for t in threads:
         t.join()
