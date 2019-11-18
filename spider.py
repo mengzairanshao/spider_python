@@ -35,6 +35,7 @@ def create_table():
     try:
         for sql2 in cat:
             c.execute(sql1 + sql2.strip(' ').replace(',', ' ').replace('  ', ' ').replace(' ', '_') + sql3)
+        print('Created DB')
     except sqlite3.OperationalError as e:
         print(e)
     return
@@ -76,7 +77,9 @@ def get_page(url):
 def threads_get_description(keyword, url, m):
     html1 = get_page(url)
     if html1 is None:
+        print('domain page cannot be got')
         return
+    print('ready to parse domain page')
     soup1 = BeautifulSoup(html1, "lxml")
     c2 = soup1.find(attrs={"name": "description"})
     m['description'] = ' '
@@ -94,9 +97,10 @@ def threads_get_description(keyword, url, m):
     try:
         c.execute(sql)
         conn.commit()
+        print('run this SQL ok')
     except:
         conn.rollback()
-        print('执行该SQL语句错误')
+        print('error to run this SQL')
     conn.close()
     lock.release()
     return 0
@@ -107,10 +111,13 @@ def parse_page1(keyword, page):
         'q': str(keyword),
         'start': page * 10
     }
+    print('request page')
     url = get_url(params)
     html = get_page(url)
     if html is None:
+        print('page is None')
         return
+    print('page is ready')
     soup = BeautifulSoup(html, "lxml")
     c = soup.select('.bkWMgd')
     c1 = []
@@ -120,6 +127,7 @@ def parse_page1(keyword, page):
     m = {'title': '', 'abstract': '', 'url': '', 'description': ''}
     for cc in c1:
         try:
+            print('parse page')
             m.clear()
             m['title'] = cc.select('.r')[0].select('a')[0].select('.S3Uucc')[0].get_text()
             m['abstract'] = cc.select('.s')[0].select('.st')[0].get_text()
@@ -130,9 +138,10 @@ def parse_page1(keyword, page):
             t = threading.Thread(target=threads_get_description, args=(keyword, domain, m.copy()))
             t.start()
             threads.append(t)
+            print('parse is ok')
         except:
             m.clear()
-            print('该条目无法解析')
+            print('this page cannot be parsed')
     return
 
 
@@ -141,6 +150,7 @@ def threads_parse_page(keyword, page):
         t = threading.Thread(target=parse_page1, args=(keyword, i))
         t.start()
         threads.append(t)
+        print('ready to start thread ',keyword)
         sleep(sleep_time)
     return 0
 
@@ -181,12 +191,9 @@ def main(keyword, page, op):
 
 if __name__ == '__main__':
     create_table()
-    if platform.system() == "Linux":
-        createDaemon()
+    if len(argv) == 1:
+        main("", "", 0)
     else:
-        if len(argv) == 1:
-            main("", "", 0)
-        else:
-            keyword_1 = argv[1]
-            page_1 = argv[2]
-            main(keyword_1, page_1, 1)
+        keyword_1 = argv[1]
+        page_1 = argv[2]
+        main(keyword_1, page_1, 1)
