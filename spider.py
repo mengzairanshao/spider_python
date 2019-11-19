@@ -7,10 +7,7 @@ from bs4 import BeautifulSoup
 from requests.exceptions import RequestException
 from sys import argv
 from time import sleep
-import json
 import sqlite3
-import time, platform
-import os
 import random
 import re
 
@@ -93,7 +90,10 @@ def threads_get_description(keyword, url, m):
     c2 = soup1.find(attrs={"name": "description"})
     m['description'] = ' '
     if c2 is not None:
-        m['description'] = c2['content']
+        try:
+            m['description'] = c2['content']
+        except:
+            print('cannot get content', file=sys.stderr)
     # 写入数据库 TODO
     lock.acquire()
     conn = sqlite3.connect('test.db')
@@ -128,7 +128,9 @@ def parse_page1(keyword, page):
         return
     print('page is ready')
     soup = BeautifulSoup(html, "lxml")
-    cat_map[keyword] = int(re.findall(r"\d+", soup.select('#resultStats')[0].contents[0])[0])
+    num = int(re.findall(r"\d+", soup.select('#resultStats')[0].contents[0])[0])
+    if num < num_of_getting:
+        cat_map[keyword] = num
     c = soup.select('.bkWMgd')
     c1 = []
     for cc in c:
@@ -165,29 +167,6 @@ def threads_parse_page(keyword, page):
         print('ready to start thread ', keyword, i + 1)
         sleep(random.randint(5, 20))
     return 0
-
-
-def createDaemon():
-    # fork进程
-    try:
-        if os.fork() > 0: os._exit(0)
-    except OSError as error:
-        print('fork #1 failed: {} {}'.format(error.errno, error.strerror))
-        os._exit(1)
-    os.chdir('/')
-    os.setsid()
-    os.umask(0)
-    try:
-        pid = os.fork()
-        if pid > 0:
-            print('Daemon PID %d' % pid)
-            os._exit(0)
-    except OSError as error:
-        print('fork #2 failed: %d (%s)' % (error.errno, error.strerror))
-        os._exit(1)
-    # 重定向标准IO
-    # 在子进程中执行代码
-    main('', '', 1)  # function demo
 
 
 def main(keyword, page, op):
