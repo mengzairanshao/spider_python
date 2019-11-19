@@ -12,6 +12,7 @@ import sqlite3
 import time, platform
 import os
 import random
+import re
 
 threads = []
 lock = threading.Lock()
@@ -19,6 +20,9 @@ sleep_time = 1
 cat = ['Phones ', 'Accessories', 'Consumer Electronics', 'Home Appliances', 'Computer ', 'Office', 'Wigs ',
        'Hair Extensions', 'Womens Clothing', 'Mens Clothing', 'Sports ', 'Outdoors', 'Home ', 'Garden', 'Health ',
        'Beauty', 'Toys, Kids ', 'Babies', 'Shoes ', 'Bags', 'Jewelry ', 'Watches', 'Automotive ', 'Motorcycles']
+
+cat_map = {}
+num_of_getting = 100
 
 
 # google搜索接口
@@ -124,6 +128,7 @@ def parse_page1(keyword, page):
         return
     print('page is ready')
     soup = BeautifulSoup(html, "lxml")
+    cat_map[keyword] = int(re.findall(r"\d+", soup.select('#resultStats')[0].contents[0])[0])
     c = soup.select('.bkWMgd')
     c1 = []
     for cc in c:
@@ -152,10 +157,12 @@ def parse_page1(keyword, page):
 
 def threads_parse_page(keyword, page):
     for i in range(0, page):
+        if (i + 1) * 10 > cat_map[keyword]:
+            break
         t = threading.Thread(target=parse_page1, args=(keyword, i))
         t.start()
         threads.append(t)
-        print('ready to start thread ', keyword)
+        print('ready to start thread ', keyword, i + 1)
         sleep(random.randint(5, 20))
     return 0
 
@@ -184,12 +191,13 @@ def createDaemon():
 
 
 def main(keyword, page, op):
-    # if op == 0:
-    #     keyword = input("输入关键字:")
-    #     page = input("输入查找页数:")
+    if op == 0:
+        keyword = input("输入关键字:")
+        page = input("输入查找页数:")
+        threads_parse_page(keyword, int(page))
     random.shuffle(cat)
     for k in cat:
-        threads_parse_page(k, 100)
+        threads_parse_page(k, num_of_getting)
     # threads_parse_page(keyword, int(page))
     for t in threads:
         t.join()
@@ -197,8 +205,10 @@ def main(keyword, page, op):
 
 if __name__ == '__main__':
     create_table()
+    for k in cat:
+        cat_map[k] = num_of_getting * 10
     if len(argv) == 1:
-        main("", "", 0)
+        main("", "", 1)
     else:
         keyword_1 = argv[1]
         page_1 = argv[2]
