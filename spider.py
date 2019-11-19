@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import sys
 import threading
 import requests
 import urllib.parse
@@ -38,7 +39,7 @@ def create_table():
             c.execute(sql1 + sql2.strip(' ').replace(',', ' ').replace('  ', ' ').replace(' ', '_') + sql3)
         print('Created DB')
     except sqlite3.OperationalError as e:
-        print(e)
+        print(e, file=sys.stderr)
     return
 
 
@@ -70,18 +71,18 @@ def get_page(url):
         # print(response.text)
         if response.status_code == 200:
             return response.text
-        print('status is not 200')
-        print(response.text)
+        print('status is not 200', file=sys.stderr)
+        print(response.text, file=sys.stderr)
         return None
     except RequestException:
-        print('request exception')
+        print('request exception', file=sys.stderr)
         return None
 
 
 def threads_get_description(keyword, url, m):
     html1 = get_page(url)
     if html1 is None:
-        print('domain page cannot be got')
+        print('domain page cannot be got', file=sys.stderr)
         return
     print('ready to parse domain page')
     soup1 = BeautifulSoup(html1, "lxml")
@@ -104,7 +105,7 @@ def threads_get_description(keyword, url, m):
         print('run this SQL ok')
     except:
         conn.rollback()
-        print('error to run this SQL')
+        print('error to run this SQL', file=sys.stderr)
     conn.close()
     lock.release()
     return 0
@@ -119,7 +120,7 @@ def parse_page1(keyword, page):
     url = get_url(params)
     html = get_page(url)
     if html is None:
-        print('page is None')
+        print('page is None', file=sys.stderr)
         return
     print('page is ready')
     soup = BeautifulSoup(html, "lxml")
@@ -145,7 +146,7 @@ def parse_page1(keyword, page):
             print('parse is ok')
         except:
             m.clear()
-            print('this page cannot be parsed')
+            print('this page cannot be parsed', file=sys.stderr)
     return
 
 
@@ -154,8 +155,8 @@ def threads_parse_page(keyword, page):
         t = threading.Thread(target=parse_page1, args=(keyword, i))
         t.start()
         threads.append(t)
-        print('ready to start thread ',keyword)
-        sleep(random.randint(5,20))
+        print('ready to start thread ', keyword)
+        sleep(random.randint(5, 20))
     return 0
 
 
